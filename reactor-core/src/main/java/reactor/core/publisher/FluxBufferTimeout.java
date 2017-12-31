@@ -22,6 +22,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 import java.util.function.Supplier;
 
 import org.reactivestreams.Subscriber;
@@ -107,12 +108,15 @@ final class FluxBufferTimeout<T, C extends Collection<? super T>> extends FluxOp
 		static final AtomicIntegerFieldUpdater<BufferTimeoutSubscriber> INDEX =
 				AtomicIntegerFieldUpdater.newUpdater(BufferTimeoutSubscriber.class, "index");
 
+		volatile C values;
+
+		static final AtomicReferenceFieldUpdater<BufferTimeoutSubscriber, Collection> VALUES =
+				AtomicReferenceFieldUpdater.newUpdater(BufferTimeoutSubscriber.class, Collection.class, "values");
 
 		volatile Disposable timespanRegistration;
 
 		final Supplier<C> bufferSupplier;
 
-		volatile C values;
 
 		BufferTimeoutSubscriber(CoreSubscriber<? super C> actual,
 				int maxSize,
@@ -134,7 +138,7 @@ final class FluxBufferTimeout<T, C extends Collection<? super T>> extends FluxOp
 							break;
 						}
 					}
-					flushCallback(null);
+					flushCallback(null, index);
 				}
 			};
 
@@ -147,25 +151,30 @@ final class FluxBufferTimeout<T, C extends Collection<? super T>> extends FluxOp
 		}
 
 		void nextCallback(T value) {
-			synchronized (this) {
-				C v = values;
-				if(v == null) {
+			C v = values;
+			if (v == null) {
+				for (;;) {
 					v = Objects.requireNonNull(bufferSupplier.get(),
 							"The bufferSupplier returned a null buffer");
-					values = v;
+					if (VALUES.compareAndSet(this, null, v)) {
+						break;
+					}
+					else if ((v = values) != null) {
+						break;
+					}
 				}
-				v.add(value);
 			}
+			v.add(value);
 		}
 
-		void flushCallback(@Nullable T ev) { //TODO investigate ev not used
+		void flushCallback(@Nullable T ev, int count) { //TODO investigate ev not used
 			C v = values;
 			boolean flush = false;
-			synchronized (this) {
-				if (v != null && !v.isEmpty()) {
-					values = bufferSupplier.get();
-					flush = true;
-				}
+
+			if (v != null && count > 0) {
+				C next = bufferSupplier.get();
+				VALUES.compareAndSet(this, v, next);
+				flush = true;
 			}
 
 			if (flush) {
@@ -239,13 +248,13 @@ final class FluxBufferTimeout<T, C extends Collection<? super T>> extends FluxOp
 					timespanRegistration.dispose();
 					timespanRegistration = null;
 				}
-				flushCallback(value);
+				flushCallback(value, index);
 			}
 		}
 
 		void checkedComplete() {
 			try {
-				flushCallback(null);
+				flushCallback(null, index);
 			}
 			finally {
 				actual.onComplete();
