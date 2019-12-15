@@ -29,6 +29,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import org.assertj.core.api.Assertions;
@@ -41,6 +42,7 @@ import reactor.core.publisher.DirectProcessor;
 import reactor.core.publisher.MonoProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SynchronousSink;
 import reactor.core.publisher.UnicastProcessor;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -2342,5 +2344,49 @@ public class StepVerifierTests {
 				.verifyComplete();
 
 		assertThat(requests).containsExactly(1L, 1L, 1L);
+	}
+
+	@Test
+	public void verifyExpectNoContextWorksCorrectly1() {
+		Function<Integer, Integer> mapping = i -> 10 / i;
+		Flux<Integer> range = Flux.range(0, 6)
+				.handle(new BiConsumer<Integer, SynchronousSink<Integer>>() {
+					@Override
+					public void accept(Integer integer, SynchronousSink<Integer> integerSynchronousSink) {
+						if (integer != 0) {
+							integerSynchronousSink.next(mapping.apply(integer));
+						}
+					}
+				});
+
+		StepVerifier.create(range)
+				.expectSubscription()
+				.expectNextCount(5)
+				.expectNoAccessibleContext()
+				.expectComplete()
+				.verify();
+
+	}
+
+	@Test
+	public void verifyExpectNoContextWorksCorrectly2() {
+		Flux<Integer> simpleFlux = Flux.just(1).map(Function.identity());
+
+		StepVerifier.create(simpleFlux)
+				.expectSubscription()
+				.expectNext(1)
+				.expectNoAccessibleContext()
+				.verifyComplete();
+	}
+
+	@Test
+	public void verifyExpectNoContextWorksCorrectly3() {
+		Flux<Integer> simpleFlux = Flux.just(1);
+
+		StepVerifier.create(simpleFlux)
+				.expectSubscription()
+				.expectNext(1)
+				.expectNoAccessibleContext()
+				.verifyComplete();
 	}
 }

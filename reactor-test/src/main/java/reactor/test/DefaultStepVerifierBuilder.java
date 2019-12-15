@@ -323,7 +323,7 @@ final class DefaultStepVerifierBuilder<T>
 					                .map(CoreSubscriber::currentContext)
 					                .blockLast();
 
-					if (c != null) {
+					if (c != null && !c.isEmpty()) {
 						throw messageFormatter.assertionError("Expected no accessible Context, got " + c);
 					}
 				});
