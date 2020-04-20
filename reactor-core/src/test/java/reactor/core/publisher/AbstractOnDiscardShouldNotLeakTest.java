@@ -2,6 +2,7 @@ package reactor.core.publisher;
 
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -46,6 +47,14 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
 
     int subscriptionsNumber() {
         return 1;
+    }
+
+    @After
+    public void tearDown() {
+        Hooks.resetOnNextDropped();
+        Hooks.resetOnErrorDropped();
+        Hooks.resetOnNextError();
+        Hooks.resetOnOperatorError();
     }
 
     @Test
