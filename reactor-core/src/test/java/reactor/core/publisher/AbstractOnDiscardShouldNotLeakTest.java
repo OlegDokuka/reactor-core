@@ -117,6 +117,69 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
     }
 
     @Test
+    public void ensureMultipleSubscribersSupportWithNoLeaksWhenPopulatedQueueRacingCancelAndOnNextAndRequest() {
+        int subscriptionsNumber = subscriptionsNumber();
+        Assumptions.assumeThat(subscriptionsNumber)
+                .isGreaterThan(1);
+        Hooks.onNextDropped(Tracked::safeRelease);
+        Hooks.onErrorDropped(e -> {});
+        Hooks.onOperatorError((e,v) -> null);
+        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber + 1);
+        scheduler.start();
+        for (int i = 0; i < 10000; i++) {
+            int[] index = new int[] {subscriptionsNumber};
+            TestPublisher<Tracked<?>>[] testPublishers = new TestPublisher[subscriptionsNumber];
+
+            for (int i1 = 0; i1 < subscriptionsNumber; i1++) {
+                testPublishers[i1] = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION, TestPublisher.Violation.REQUEST_OVERFLOW);
+            }
+
+            Publisher<Tracked<?>> source = transform(testPublishers[0], Arrays.copyOfRange(testPublishers, 1, testPublishers.length));
+
+            if (conditional) {
+                if (source instanceof Flux) {
+                    source = ((Flux<Tracked<?>>)source).filter(t -> true);
+                } else {
+                    source = ((Mono<Tracked<?>>)source).filter(t -> true);
+                }
+            }
+
+            AssertSubscriber<Tracked<?>> assertSubscriber = new AssertSubscriber<>(Operators.enableOnDiscard(null, Tracked::safeRelease), 0);
+            if (fused) {
+                assertSubscriber.requestedFusionMode(Fuseable.ANY);
+            }
+            source.subscribe(assertSubscriber);
+            int startIndex = --index[0];
+            Tracked<String> value11 = new Tracked<>(startIndex+"1");
+            Tracked<String> value12 = new Tracked<>(startIndex+"2");
+            Tracked<String> value13 = new Tracked<>(startIndex+"3");
+            Tracked<String> value14 = new Tracked<>(startIndex+"4");
+            int secondIndex = --index[0];
+            Tracked<String> value21 = new Tracked<>(secondIndex+"1");
+            Tracked<String> value22 = new Tracked<>(secondIndex+"2");
+            Tracked<String> value23 = new Tracked<>(secondIndex+"3");
+            Tracked<String> value24 = new Tracked<>(secondIndex+"4");
+            Runnable action = () -> RaceTestUtils.race(() -> testPublishers[startIndex].next(value11, value12, value13, value14), () -> testPublishers[secondIndex].next(value21, value22, value23, value24), scheduler);
+
+            while (index[0] > 0) {
+                int nextIndex = --index[0];
+                Tracked<String> nextValue1 = new Tracked<>(nextIndex+"1");
+                Tracked<String> nextValue2 = new Tracked<>(nextIndex+"2");
+                Tracked<String> nextValue3 = new Tracked<>(nextIndex+"3");
+                Tracked<String> nextValue4 = new Tracked<>(nextIndex+"4");
+                Runnable nextAction = action;
+                action = () -> RaceTestUtils.race(nextAction, () -> testPublishers[nextIndex].next(nextValue1, nextValue2, nextValue3, nextValue4), scheduler);
+            }
+            RaceTestUtils.race(() -> RaceTestUtils.race(assertSubscriber::cancel, () -> assertSubscriber.request(Long.MAX_VALUE), scheduler), action, scheduler);
+            List<Tracked<?>> values = assertSubscriber.values();
+            values.forEach(Tracked::release);
+
+            Tracked.assertNoLeaks();
+        }
+        scheduler.dispose();
+    }
+
+    @Test
     public void ensureNoLeaksPopulatedQueueAndRacingCancelAndOnNext() {
         Assumptions.assumeThat(subscriptionsNumber())
                 .isOne();
