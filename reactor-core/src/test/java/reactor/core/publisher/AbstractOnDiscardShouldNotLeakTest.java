@@ -54,7 +54,7 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
         int subscriptionsNumber = subscriptionsNumber();
-        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber);
+        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber + 1);
         scheduler.start();
         for (int i = 0; i < 10000; i++) {
             int[] index = new int[] {subscriptionsNumber};
@@ -82,7 +82,7 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
 
             if (subscriptionsNumber == 1) {
                 Tracked<Integer> value = new Tracked<>(1);
-                RaceTestUtils.race(() -> RaceTestUtils.race(assertSubscriber::cancel, () -> assertSubscriber.request(Long.MAX_VALUE)), () -> testPublishers[0].next(value), scheduler);
+                RaceTestUtils.race(() -> RaceTestUtils.race(assertSubscriber::cancel, () -> assertSubscriber.request(Long.MAX_VALUE), scheduler), () -> testPublishers[0].next(value), scheduler);
             } else {
                 int startIndex = --index[0];
                 Tracked<Integer> value1 = new Tracked<>(startIndex);
@@ -96,7 +96,7 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
                     Runnable nextAction = action;
                     action = () -> RaceTestUtils.race(nextAction, () -> testPublishers[nextIndex].next(nextValue), scheduler);
                 }
-                RaceTestUtils.race(() -> RaceTestUtils.race(assertSubscriber::cancel, () -> assertSubscriber.request(Long.MAX_VALUE)), action, scheduler);
+                RaceTestUtils.race(() -> RaceTestUtils.race(assertSubscriber::cancel, () -> assertSubscriber.request(Long.MAX_VALUE), scheduler), action, scheduler);
             }
 
             List<Tracked<?>> values = assertSubscriber.values();
@@ -104,6 +104,7 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
 
             Tracked.assertNoLeaks();
         }
+        scheduler.dispose();
     }
 
     @Test
@@ -113,6 +114,8 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onNextDropped(Tracked::safeRelease);
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
+        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber() + 1);
+        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             TestPublisher<Tracked<?>> testPublisher = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION, TestPublisher.Violation.REQUEST_OVERFLOW);
             Publisher<Tracked<?>> source = transform(testPublisher);
@@ -148,13 +151,14 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
                 testPublisher.next(value3);
                 testPublisher.next(value4);
                 testPublisher.next(value5);
-            });
+            }, scheduler);
 
             List<Tracked<?>> values = assertSubscriber.values();
             values.forEach(Tracked::release);
 
             Tracked.assertNoLeaks();
         }
+        scheduler.dispose();
     }
 
     @Test
@@ -164,6 +168,8 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onNextDropped(Tracked::safeRelease);
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
+        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber() + 1);
+        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             TestPublisher<Tracked<?>> testPublisher = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION, TestPublisher.Violation.REQUEST_OVERFLOW);
             Publisher<Tracked<?>> source = transform(testPublisher);
@@ -193,13 +199,14 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
             testPublisher.next(new Tracked<>(3));
             testPublisher.next(new Tracked<>(4));
 
-            RaceTestUtils.race(assertSubscriber::cancel, () -> testPublisher.complete());
+            RaceTestUtils.race(assertSubscriber::cancel, () -> testPublisher.complete(), scheduler);
 
             List<Tracked<?>> values = assertSubscriber.values();
             values.forEach(Tracked::release);
 
             Tracked.assertNoLeaks();
         }
+        scheduler.dispose();
     }
 
     @Test
@@ -209,6 +216,8 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onNextDropped(Tracked::safeRelease);
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
+        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber() + 1);
+        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             TestPublisher<Tracked<?>> testPublisher = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION, TestPublisher.Violation.REQUEST_OVERFLOW);
             Publisher<Tracked<?>> source = transform(testPublisher);
@@ -238,7 +247,7 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
             testPublisher.next(new Tracked<>(3));
             testPublisher.next(new Tracked<>(4));
 
-            RaceTestUtils.race(assertSubscriber::cancel, () -> testPublisher.error(new RuntimeException("test")));
+            RaceTestUtils.race(assertSubscriber::cancel, () -> testPublisher.error(new RuntimeException("test")), scheduler);
 
             List<Tracked<?>> values = assertSubscriber.values();
             values.forEach(Tracked::release);
@@ -249,6 +258,7 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
 
             Tracked.assertNoLeaks();
         }
+        scheduler.dispose();
     }
 
     @Test
@@ -258,6 +268,8 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onNextDropped(Tracked::safeRelease);
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
+        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber() + 1);
+        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             TestPublisher<Tracked<?>> testPublisher = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION, TestPublisher.Violation.REQUEST_OVERFLOW);
             Publisher<Tracked<?>> source = transform(testPublisher);
@@ -307,6 +319,7 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
 
             Tracked.assertNoLeaks();
         }
+        scheduler.dispose();
     }
 
     @Test
@@ -316,6 +329,8 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onNextDropped(Tracked::safeRelease);
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
+        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber() + 1);
+        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             TestPublisher<Tracked<?>> testPublisher = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION, TestPublisher.Violation.REQUEST_OVERFLOW);
             Publisher<Tracked<?>> source = transform(testPublisher);
@@ -345,13 +360,14 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
             testPublisher.next(new Tracked<>(3));
             testPublisher.next(new Tracked<>(4));
 
-            RaceTestUtils.race(assertSubscriber::cancel, () -> assertSubscriber.request(Long.MAX_VALUE));
+            RaceTestUtils.race(assertSubscriber::cancel, () -> assertSubscriber.request(Long.MAX_VALUE), scheduler);
 
             List<Tracked<?>> values = assertSubscriber.values();
             values.forEach(Tracked::release);
 
             Tracked.assertNoLeaks();
         }
+        scheduler.dispose();
     }
 
     public static final class Tracked<T> extends AtomicBoolean {
