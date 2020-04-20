@@ -1,5 +1,8 @@
 package reactor.core.publisher;
 
+import org.reactivestreams.Publisher;
+import reactor.test.publisher.TestPublisher;
+
 import java.util.Arrays;
 
 public class FluxFlatMapIterableOnDiscardShouldNotLeakTest extends AbstractOnDiscardShouldNotLeakTest {
@@ -9,8 +12,9 @@ public class FluxFlatMapIterableOnDiscardShouldNotLeakTest extends AbstractOnDis
     }
 
     @Override
-    Flux<Tracked<?>> transform(Flux<Tracked<?>> upstream) {
-        return upstream
+    protected Publisher<Tracked<?>> transform(TestPublisher<Tracked<?>> main, TestPublisher<Tracked<?>>... additional) {
+        return main
+                .flux()
                 .flatMapIterable(Arrays::asList);
     }
 }

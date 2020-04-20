@@ -1,6 +1,8 @@
 package reactor.core.publisher;
 
+import org.reactivestreams.Publisher;
 import reactor.core.scheduler.Schedulers;
+import reactor.test.publisher.TestPublisher;
 
 public class FluxPublishOnOnDiscardShouldNotLeakTest extends AbstractOnDiscardShouldNotLeakTest {
 
@@ -9,8 +11,9 @@ public class FluxPublishOnOnDiscardShouldNotLeakTest extends AbstractOnDiscardSh
     }
 
     @Override
-    Flux<Tracked<?>> transform(Flux<Tracked<?>> upstream) {
-        return upstream
+    protected Publisher<Tracked<?>> transform(TestPublisher<Tracked<?>> main, TestPublisher<Tracked<?>>... additional) {
+        return main
+                .flux()
                 .publishOn(Schedulers.immediate());
     }
 }

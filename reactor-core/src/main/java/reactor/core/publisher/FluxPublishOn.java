@@ -230,6 +230,7 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 			}
 
 			if (!queue.offer(t)) {
+				Operators.onDiscard(t, actual.currentContext());
 				error = Operators.onOperatorError(s,
 						Exceptions.failWithOverflow(Exceptions.BACKPRESSURE_ERROR_QUEUE_FULL),
 						t, actual.currentContext());
@@ -709,6 +710,7 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 				return;
 			}
 			if (!queue.offer(t)) {
+				Operators.onDiscard(t, actual.currentContext());
 				error = Operators.onOperatorError(s, Exceptions.failWithOverflow(Exceptions.BACKPRESSURE_ERROR_QUEUE_FULL), t,
 						actual.currentContext());
 				done = true;
