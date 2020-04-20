@@ -90,6 +90,9 @@ public class SerializedSubscriberTest {
 		AtomicInteger seen = new AtomicInteger();
 
 		final CountDownLatch latch = new CountDownLatch(1);
+		final CountDownLatch latch1 = new CountDownLatch(1);
+		final CountDownLatch latch2 = new CountDownLatch(1);
+		final CountDownLatch latch3 = new CountDownLatch(1);
 		Flux.<Integer>generate(s -> {
 			int i = counter.incrementAndGet();
 			if (i == 100_000) {
@@ -100,28 +103,36 @@ public class SerializedSubscriberTest {
 				s.next(i);
 			}
 		})
+			.doFinally(sig -> latch.countDown())
 		    .publishOn(Schedulers.single())
+			.doFinally(sig -> latch1.countDown())
 		    .retryWhen(p -> p.take(3))
+			.doFinally(sig -> latch2.countDown())
 		    .cancelOn(Schedulers.parallel())
 		    .doOnDiscard(Integer.class, i -> discarded.incrementAndGet())
-		    .doFinally(sig -> latch.countDown())
-		    .doOnNext(i -> seen.incrementAndGet())
+		    .doFinally(sig -> latch3.countDown())
             .subscribeWith(new BaseSubscriber<Integer>() {
 	            @Override
 	            protected void hookOnNext(Integer value) {
+					seen.incrementAndGet();
 		            cancel();
 	            }
             });
 
 		assertThat(latch.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
+		assertThat(latch1.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
+		assertThat(latch2.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
+		assertThat(latch3.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
 		with().pollInterval(50, TimeUnit.MILLISECONDS)
 		      .await().atMost(500, TimeUnit.MILLISECONDS)
 		      .untilAsserted(() -> {
-			      //counter now holds the next value it would have emitted, so total emitted == counter - 1
-			      assertThat(counter.get() - 1)
+				  int expectedCnt = counter.get();
+				  int snn = seen.get();
+				  int discrdd = discarded.get();
+				  assertThat(expectedCnt)
 					      .withFailMessage("counter not equal to seen+discarded: Expected <%s>, got <%s+%s>=<%s>",
-							      counter, seen, discarded, seen.get() + discarded.get())
-					      .isEqualTo(seen.get() + discarded.get());
+							      expectedCnt, seen, discarded, snn + discrdd)
+					      .isEqualTo(snn + discrdd);
 		      });
 	}
 
