@@ -3,6 +3,7 @@ package reactor.core.publisher;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -37,6 +38,8 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
 
     private final boolean conditional;
     private final boolean fused;
+    
+    private Scheduler scheduler;
 
     public AbstractOnDiscardShouldNotLeakTest(boolean conditional, boolean fused) {
         this.conditional = conditional;
@@ -48,9 +51,16 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
     int subscriptionsNumber() {
         return 1;
     }
+    
+    @Before
+    public void setUp() {
+        scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber() + 1);
+        scheduler.start();
+    }
 
     @After
     public void tearDown() {
+        scheduler.dispose();
         Hooks.resetOnNextDropped();
         Hooks.resetOnErrorDropped();
         Hooks.resetOnNextError();
@@ -63,8 +73,6 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
         int subscriptionsNumber = subscriptionsNumber();
-        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber + 1);
-        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             int[] index = new int[] {subscriptionsNumber};
             TestPublisher<Tracked<?>>[] testPublishers = new TestPublisher[subscriptionsNumber];
@@ -124,8 +132,6 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onNextDropped(Tracked::safeRelease);
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
-        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber + 1);
-        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             int[] index = new int[] {subscriptionsNumber};
             TestPublisher<Tracked<?>>[] testPublishers = new TestPublisher[subscriptionsNumber];
@@ -401,8 +407,6 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
         Hooks.onNextDropped(Tracked::safeRelease);
         Hooks.onErrorDropped(e -> {});
         Hooks.onOperatorError((e,v) -> null);
-        Scheduler scheduler = Schedulers.newParallel("testScheduler", subscriptionsNumber() + 1);
-        scheduler.start();
         for (int i = 0; i < 10000; i++) {
             TestPublisher<Tracked<?>> testPublisher = TestPublisher.createNoncompliant(TestPublisher.Violation.DEFER_CANCELLATION, TestPublisher.Violation.REQUEST_OVERFLOW);
             Publisher<Tracked<?>> source = transform(testPublisher);
