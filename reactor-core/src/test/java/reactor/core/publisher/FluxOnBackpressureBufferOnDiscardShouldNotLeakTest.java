@@ -1,18 +1,16 @@
 package reactor.core.publisher;
 
 import org.reactivestreams.Publisher;
-import reactor.test.publisher.TestPublisher;
 
-public class FluxOnBackpressureBufferOnDiscardShouldNotLeakTest extends AbstractOnDiscardShouldNotLeakTest {
+public class FluxOnBackpressureBufferOnDiscardShouldNotLeakTest extends AbstractFluxOnDiscardShouldNotLeakTest {
 
     public FluxOnBackpressureBufferOnDiscardShouldNotLeakTest(boolean conditional, boolean fused) {
         super(conditional, fused);
     }
 
     @Override
-    protected Publisher<Tracked<?>> transform(TestPublisher<Tracked<?>> main, TestPublisher<Tracked<?>>... additional) {
+    protected Publisher<Tracked<?>> transform(Flux<Tracked<?>> main, Flux<Tracked<?>>... additional) {
         return main
-                .flux()
                 .onBackpressureBuffer();
     }
 }

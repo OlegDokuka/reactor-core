@@ -5,16 +5,15 @@ import reactor.test.publisher.TestPublisher;
 
 import java.util.Arrays;
 
-public class FluxFlatMapIterableOnDiscardShouldNotLeakTest extends AbstractOnDiscardShouldNotLeakTest {
+public class FluxFlatMapIterableOnDiscardShouldNotLeakTest extends AbstractFluxOnDiscardShouldNotLeakTest {
 
     public FluxFlatMapIterableOnDiscardShouldNotLeakTest(boolean conditional, boolean fused) {
         super(conditional, fused);
     }
 
     @Override
-    protected Publisher<Tracked<?>> transform(TestPublisher<Tracked<?>> main, TestPublisher<Tracked<?>>... additional) {
+    protected Publisher<Tracked<?>> transform(Flux<Tracked<?>> main, Flux<Tracked<?>>... additional) {
         return main
-                .flux()
                 .flatMapIterable(Arrays::asList);
     }
 }
