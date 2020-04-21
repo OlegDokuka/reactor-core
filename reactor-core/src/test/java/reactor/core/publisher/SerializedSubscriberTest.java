@@ -89,10 +89,7 @@ public class SerializedSubscriberTest {
 		AtomicInteger discarded = new AtomicInteger();
 		AtomicInteger seen = new AtomicInteger();
 
-		final CountDownLatch latch = new CountDownLatch(1);
-		final CountDownLatch latch1 = new CountDownLatch(1);
-		final CountDownLatch latch2 = new CountDownLatch(1);
-		final CountDownLatch latch3 = new CountDownLatch(1);
+		final CountDownLatch latch = new CountDownLatch(4);
 		Flux.<Integer>generate(s -> {
 			int i = counter.incrementAndGet();
 			if (i == 100_000) {
@@ -105,12 +102,12 @@ public class SerializedSubscriberTest {
 		})
 			.doFinally(sig -> latch.countDown())
 		    .publishOn(Schedulers.single())
-			.doFinally(sig -> latch1.countDown())
+			.doFinally(sig -> latch.countDown())
 		    .retryWhen(p -> p.take(3))
-			.doFinally(sig -> latch2.countDown())
+			.doFinally(sig -> latch.countDown())
 		    .cancelOn(Schedulers.parallel())
 		    .doOnDiscard(Integer.class, i -> discarded.incrementAndGet())
-		    .doFinally(sig -> latch3.countDown())
+		    .doFinally(sig -> latch.countDown())
             .subscribeWith(new BaseSubscriber<Integer>() {
 	            @Override
 	            protected void hookOnNext(Integer value) {
@@ -120,9 +117,6 @@ public class SerializedSubscriberTest {
             });
 
 		assertThat(latch.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
-		assertThat(latch1.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
-		assertThat(latch2.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
-		assertThat(latch3.await(5, TimeUnit.SECONDS)).as("latch 5s").isTrue();
 		with().pollInterval(50, TimeUnit.MILLISECONDS)
 		      .await().atMost(500, TimeUnit.MILLISECONDS)
 		      .untilAsserted(() -> {
