@@ -938,10 +938,6 @@ public class FluxFlatMapTest {
 	}
 
 	void assertAfterOnNextInnerState(InnerConsumer s) {
-		assertThat(s.scan(Scannable.Attr.BUFFERED)).isEqualTo(1);
-	}
-
-	void assertAfterOnNextInnerState2(InnerConsumer s) {
 		assertThat(s.scan(Scannable.Attr.BUFFERED)).isEqualTo(0);
 	}
 
@@ -985,13 +981,15 @@ public class FluxFlatMapTest {
 			                        s.onNext(f);
 			                        assertAfterOnNextInnerState(((FluxFlatMap.FlatMapInner) s));
 			                        assertAfterOnCompleteInnerState(((FluxFlatMap.FlatMapInner) s));
-			                        assertThat(((FluxFlatMap.FlatMapInner)s).scan(Scannable.Attr.BUFFERED)).isEqualTo(1);
+			                        // element is discarded, so buffer MUST be empty
+			                        assertThat(((FluxFlatMap.FlatMapInner)s).scan(Scannable.Attr.BUFFERED)).isEqualTo(0);
 			                        s.onComplete();
-			                        assertAfterOnCompleteInnerState(((FluxFlatMap.FlatMapInner) s));
+			                        assertAfterOnCompleteInnerState2(((FluxFlatMap.FlatMapInner) s));
 		                        }), 1), 1)
 		            .expectNext(1)
 		            .thenCancel()
-		.verify();
+		.verifyThenAssertThat()
+		.hasDiscarded(1);
 	}
 
 	@Test
@@ -1088,7 +1086,7 @@ public class FluxFlatMapTest {
 			                        assertAfterOnSubscribeInnerState(((FluxFlatMap
 					                        .FlatMapInner) s).parent);
 			                        s.onNext(f);
-			                        assertAfterOnNextInnerState2(((FluxFlatMap
+			                        assertAfterOnNextInnerState(((FluxFlatMap
 					                        .FlatMapInner) s));
 			                        s.onComplete();
 			                        assertAfterOnCompleteInnerState2(((FluxFlatMap.FlatMapInner) s));
