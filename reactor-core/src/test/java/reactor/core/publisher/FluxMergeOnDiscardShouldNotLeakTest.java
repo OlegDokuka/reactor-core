@@ -21,6 +21,6 @@ public class FluxMergeOnDiscardShouldNotLeakTest extends AbstractFluxOnDiscardSh
 
     @Override
     int subscriptionsNumber() {
-        return Queues.XS_BUFFER_SIZE;
+        return 4;
     }
 }
