@@ -289,8 +289,12 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 				@Nullable Throwable suppressed,
 				@Nullable Object dataSignal) {
 			if (WIP.getAndIncrement(this) != 0) {
-				if (dataSignal != null && cancelled) {
-					Operators.onDiscard(dataSignal, actual.currentContext());
+				if (cancelled) {
+					if (dataSignal != null) {
+						Operators.onDiscard(dataSignal, actual.currentContext());
+					} else if (suppressed != null) {
+						Operators.onErrorDropped(suppressed, actual.currentContext());
+					}
 				}
 				return;
 			}

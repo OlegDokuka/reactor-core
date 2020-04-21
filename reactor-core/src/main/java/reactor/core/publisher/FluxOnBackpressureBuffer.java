@@ -174,7 +174,7 @@ final class FluxOnBackpressureBuffer<O> extends FluxOperator<O, O> implements Fu
 				onError(ex);
 				return;
 			}
-			drain(t);
+			drain(null, t);
 		}
 
 		@Override
@@ -185,7 +185,7 @@ final class FluxOnBackpressureBuffer<O> extends FluxOperator<O, O> implements Fu
 			}
 			error = t;
 			done = true;
-			drain(null);
+			drain(t, null);
 		}
 
 		@Override
@@ -194,13 +194,17 @@ final class FluxOnBackpressureBuffer<O> extends FluxOperator<O, O> implements Fu
 				return;
 			}
 			done = true;
-			drain(null);
+			drain(null, null);
 		}
 
-		void drain(@Nullable T dataSignal) {
+		void drain(@Nullable Throwable suppressed, @Nullable T dataSignal) {
 			if (WIP.getAndIncrement(this) != 0) {
-				if (dataSignal != null && cancelled) {
-					Operators.onDiscard(dataSignal, actual.currentContext());
+				if (cancelled) {
+					if (dataSignal != null) {
+						Operators.onDiscard(dataSignal, actual.currentContext());
+					} else if (suppressed != null) {
+						Operators.onErrorDropped(suppressed, actual.currentContext());
+					}
 				}
 				return;
 			}
@@ -312,7 +316,7 @@ final class FluxOnBackpressureBuffer<O> extends FluxOperator<O, O> implements Fu
 		public void request(long n) {
 			if (Operators.validate(n)) {
 				Operators.addCap(REQUESTED, this, n);
-				drain(null);
+				drain(null, null);
 			}
 		}
 

@@ -39,6 +39,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import reactor.test.publisher.TestPublisher;
 import reactor.test.subscriber.AssertSubscriber;
+import reactor.test.util.RaceTestUtils;
 import reactor.util.concurrent.Queues;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1593,23 +1594,26 @@ public class FluxFlatMapTest {
 
 	@Test
 	public void errorModeContinueInternalErrorStopStrategyAsync() {
+		AtomicInteger i = new AtomicInteger();
+		TestPublisher<Integer>[] inners = new TestPublisher[]{TestPublisher.create(), TestPublisher.create()};
 		Flux<Integer> test = Flux
 				.just(0, 1)
 				.hide()
-				.flatMap(f ->  Flux.range(f, 1).publishOn(Schedulers.parallel()).map(i -> 1/i).onErrorStop())
+				.flatMap(f -> inners[i.getAndIncrement()].flux())
 				.onErrorContinue(OnNextFailureStrategyTest::drop);
 
 		StepVerifier.Assertions assertions = StepVerifier
 				.create(test)
 				.expectNoFusionSupport()
+				.then(() -> RaceTestUtils.race(() -> inners[0].error(new ArithmeticException()), () -> inners[0].error(new ArithmeticException())))
 				.expectNext(1)
 				.expectComplete()
 				.verifyThenAssertThat();
 
 		Awaitility.with().pollDelay(org.awaitility.Duration.ZERO).pollInterval(org.awaitility.Duration.ONE_MILLISECOND)
-		          .await()
-		          .atMost(org.awaitility.Duration.ONE_SECOND)
-		          .untilAsserted(() -> assertions.hasNotDroppedElements().hasDroppedErrors(1));
+				.await()
+				.atMost(org.awaitility.Duration.ONE_SECOND)
+				.untilAsserted(() -> assertions.hasNotDroppedElements().hasDroppedErrors(1));
 	}
 
 	@Test
