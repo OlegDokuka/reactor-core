@@ -1577,43 +1577,59 @@ public class FluxFlatMapTest {
 
 	@Test
 	public void errorModeContinueInternalErrorStopStrategy() {
-		Flux<Integer> test = Flux
-				.just(0, 1)
-				.hide()
-				.flatMap(f ->  Flux.range(f, 1).map(i -> 1/i).onErrorStop())
-				.onErrorContinue(OnNextFailureStrategyTest::drop);
+		for (int iterations = 0; iterations < 1000; iterations++) {
+			AtomicInteger i = new AtomicInteger();
+			TestPublisher<Integer>[] inners = new TestPublisher[]{
+					TestPublisher.createNoncompliant(TestPublisher.Violation.CLEANUP_ON_TERMINATE),
+					TestPublisher.createNoncompliant(TestPublisher.Violation.CLEANUP_ON_TERMINATE)
+			};
+			Flux<Integer> test = Flux
+					.just(0, 1)
+					.hide()
+					.flatMap(f -> inners[i.getAndIncrement()].flux().map(n -> n / f).onErrorStop())
+					.onErrorContinue(OnNextFailureStrategyTest::drop);
 
-		StepVerifier.create(test)
-				.expectNoFusionSupport()
-				.expectNext(1)
-				.expectComplete()
-				.verifyThenAssertThat()
-				.hasNotDroppedElements()
-				.hasDroppedErrors(1);
+			StepVerifier.create(test)
+					.expectNoFusionSupport()
+					.then(() -> {
+						inners[0].next(1).complete();
+						inners[1].next(1).complete();
+					})
+					.expectNext(1)
+					.expectComplete()
+					.verifyThenAssertThat()
+					.hasNotDroppedElements()
+					.hasDroppedErrors(1);
+		}
 	}
 
 	@Test
 	public void errorModeContinueInternalErrorStopStrategyAsync() {
-		AtomicInteger i = new AtomicInteger();
-		TestPublisher<Integer>[] inners = new TestPublisher[]{TestPublisher.create(), TestPublisher.create()};
-		Flux<Integer> test = Flux
-				.just(0, 1)
-				.hide()
-				.flatMap(f -> inners[i.getAndIncrement()].flux())
-				.onErrorContinue(OnNextFailureStrategyTest::drop);
+		for (int iterations = 0; iterations < 1000; iterations++) {
+			AtomicInteger i = new AtomicInteger();
+			TestPublisher<Integer>[] inners = new TestPublisher[]{
+				TestPublisher.createNoncompliant(TestPublisher.Violation.CLEANUP_ON_TERMINATE),
+				TestPublisher.createNoncompliant(TestPublisher.Violation.CLEANUP_ON_TERMINATE)
+			};
+			Flux<Integer> test = Flux
+					.just(0, 1)
+					.hide()
+					.flatMap(f -> inners[i.getAndIncrement()].flux().map(n -> n / f).onErrorStop())
+					.onErrorContinue(OnNextFailureStrategyTest::drop);
 
-		StepVerifier.Assertions assertions = StepVerifier
-				.create(test)
-				.expectNoFusionSupport()
-				.then(() -> RaceTestUtils.race(() -> inners[0].error(new ArithmeticException()), () -> inners[0].error(new ArithmeticException())))
-				.expectNext(1)
-				.expectComplete()
-				.verifyThenAssertThat();
+			StepVerifier.Assertions assertions = StepVerifier
+					.create(test)
+					.expectNoFusionSupport()
+					.then(() -> RaceTestUtils.race(() -> inners[0].next(1).complete(), () -> inners[1].next(1).complete()))
+					.expectNext(1)
+					.expectComplete()
+					.verifyThenAssertThat();
 
-		Awaitility.with().pollDelay(org.awaitility.Duration.ZERO).pollInterval(org.awaitility.Duration.ONE_MILLISECOND)
-				.await()
-				.atMost(org.awaitility.Duration.ONE_SECOND)
-				.untilAsserted(() -> assertions.hasNotDroppedElements().hasDroppedErrors(1));
+			Awaitility.with().pollDelay(org.awaitility.Duration.ZERO).pollInterval(org.awaitility.Duration.ONE_MILLISECOND)
+					.await()
+					.atMost(org.awaitility.Duration.ONE_SECOND)
+					.untilAsserted(() -> assertions.hasNotDroppedElements().hasDroppedErrors(1));
+		}
 	}
 
 	@Test
