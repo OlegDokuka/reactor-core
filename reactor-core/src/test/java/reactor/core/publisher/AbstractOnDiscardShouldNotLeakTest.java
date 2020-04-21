@@ -60,11 +60,11 @@ public abstract class AbstractOnDiscardShouldNotLeakTest {
 
     @After
     public void tearDown() {
-        scheduler.dispose();
         Hooks.resetOnNextDropped();
         Hooks.resetOnErrorDropped();
         Hooks.resetOnNextError();
         Hooks.resetOnOperatorError();
+        scheduler.dispose();
     }
 
     @Test
