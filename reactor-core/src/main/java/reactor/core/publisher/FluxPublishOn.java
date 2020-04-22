@@ -289,12 +289,8 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 				@Nullable Throwable suppressed,
 				@Nullable Object dataSignal) {
 			if (WIP.getAndIncrement(this) != 0) {
-				if (cancelled) {
-					if (dataSignal != null) {
-						Operators.onDiscard(dataSignal, actual.currentContext());
-					} else if (suppressed != null) {
-						Operators.onErrorDropped(suppressed, actual.currentContext());
-					}
+				if (dataSignal != null && cancelled) {
+					Operators.onDiscard(dataSignal, actual.currentContext());
 				}
 				return;
 			}
@@ -447,7 +443,6 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 
 				if (cancelled) {
 					Operators.onDiscardQueueWithClear(queue, actual.currentContext(), null);
-
 					return;
 				}
 
@@ -713,6 +708,12 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 				Operators.onNextDropped(t, actual.currentContext());
 				return;
 			}
+
+			if (cancelled) {
+				Operators.onDiscard(t, actual.currentContext());
+				return;
+			}
+
 			if (!queue.offer(t)) {
 				Operators.onDiscard(t, actual.currentContext());
 				error = Operators.onOperatorError(s, Exceptions.failWithOverflow(Exceptions.BACKPRESSURE_ERROR_QUEUE_FULL), t,
