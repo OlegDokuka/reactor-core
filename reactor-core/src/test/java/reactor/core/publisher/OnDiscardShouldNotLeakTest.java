@@ -31,7 +31,7 @@ public class OnDiscardShouldNotLeakTest {
 
     //add DiscardScenarios here to test more operators
     private static DiscardScenario[] SCENARIOS = new DiscardScenario[] {
-                DiscardScenario.allFluxSourceArray("merge", 1, Flux::merge),
+                DiscardScenario.allFluxSourceArray("merge", 4, Flux::merge),
                 DiscardScenario.fluxSource("onBackpressureBuffer", 1, Flux::onBackpressureBuffer),
                 DiscardScenario.rawSource("flatMapInner", 1, raw -> Flux.just(1).flatMap(f -> raw)),
                 DiscardScenario.fluxSource("flatMap", 1, main -> main.flatMap(f -> Mono.just(f).hide().flux())),
